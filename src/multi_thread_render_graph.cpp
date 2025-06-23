@@ -30,20 +30,27 @@
              node = conn.destination;
          }
      }
-     this->root = new Node();
-     this->root->current = this->graph->getNodeForId(node.nodeID)->getProcessor();
-     this->buildNode(node,this->root);
+
+     for (auto conn : connections) {
+         std::vector<juce::AudioProcessorGraph::NodeID> paths;
+         if (node.nodeID == conn.destination.nodeID) {
+             paths.push_back(conn.source.nodeID);
+             buildNode(conn.source,&paths);
+         }
+         if (paths.size() > 0) {
+             RenderPath renderNodes;
+             renderNodes.nodes = paths;
+             this->paths.push_back(renderNodes);
+         }
+     }
  }
 
-Node* MultiThreadGraphRender::buildNode(const juce::AudioProcessorGraph::NodeAndChannel &node,Node* container) {
+void MultiThreadGraphRender::buildNode(const juce::AudioProcessorGraph::NodeAndChannel &node, std::vector<juce::AudioProcessorGraph::NodeID>* container) {
      auto connections = this->graph->getConnections();
      for (auto conn : connections) {
         if (conn.destination.nodeID == node.nodeID) {
-            auto n = new Node();
-            n->current = this->graph->getNodeForId(conn.source.nodeID)->getProcessor();
-            buildNode(conn.source,n);
-            container->children.push_back(n);
+            container->push_back(conn.source.nodeID);
+            buildNode(conn.source,container);
         }
      }
-     return container;
 }

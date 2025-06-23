@@ -1,7 +1,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include "../src/multi_thread_graph_render.h"
-
+#include <random>
 class ExampleProcessor : public juce::AudioProcessor {
 private:
     juce::String name;
@@ -19,7 +19,14 @@ private:
 
     void releaseResources() override {}
 
-    void processBlock(juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages) override {}
+    void processBlock(juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages) override {
+        std::cout << "Processing " << this->getName() << std::endl;
+        std::random_device rd;  // 用于获取种子
+        std::mt19937 gen(rd()); // 使用Mersenne Twister引擎
+        std::uniform_int_distribution<> dis(1, 10); // 均匀分布，范围[1, 5]
+        std::this_thread::sleep_for(std::chrono::milliseconds(dis(gen)));
+        std::cout << "Processed " << this->getName() << std::endl;
+    }
 
     double getTailLengthSeconds() const override { return 0.0; }
 
@@ -73,8 +80,8 @@ int main() {
     auto rootNode =  graph->addNode(std::move(root));
     {
         std::unique_ptr<juce::AudioProcessor> t1 = std::make_unique<ExampleProcessor>("Track 1");
-        auto p1 = std::make_unique<ExampleProcessor>("EQ");
-        auto p2 = std::make_unique<ExampleProcessor>("Limiter");
+        auto p1 = std::make_unique<ExampleProcessor>("EQ 1");
+        auto p2 = std::make_unique<ExampleProcessor>("Limiter 1");
         auto n1 = graph->addNode(std::move(t1),{},juce::AudioProcessorGraph::UpdateKind::sync);
         auto n2 = graph->addNode(std::move(p1),{},juce::AudioProcessorGraph::UpdateKind::sync);
         auto n3 = graph->addNode(std::move(p2),{},juce::AudioProcessorGraph::UpdateKind::sync);
@@ -87,9 +94,9 @@ int main() {
     }
     {
         std::unique_ptr<juce::AudioProcessor> t1 = std::make_unique<ExampleProcessor>("Track 2");
-        auto p1 = std::make_unique<ExampleProcessor>("EQ");
-        auto p2 = std::make_unique<ExampleProcessor>("Limiter");
-        auto p3 = std::make_unique<ExampleProcessor>("Reverb");
+        auto p1 = std::make_unique<ExampleProcessor>("EQ 2");
+        auto p2 = std::make_unique<ExampleProcessor>("Limiter 2");
+        auto p3 = std::make_unique<ExampleProcessor>("Reverb 2");
         auto n1 = graph->addNode(std::move(t1),{},juce::AudioProcessorGraph::UpdateKind::sync);
         auto n2 = graph->addNode(std::move(p1),{},juce::AudioProcessorGraph::UpdateKind::sync);
         auto n3 = graph->addNode(std::move(p2),{},juce::AudioProcessorGraph::UpdateKind::sync);
@@ -104,7 +111,7 @@ int main() {
 
     {
         std::unique_ptr<juce::AudioProcessor> t1 = std::make_unique<ExampleProcessor>("Track 3");
-        auto p1 = std::make_unique<ExampleProcessor>("EQ");
+        auto p1 = std::make_unique<ExampleProcessor>("EQ 3");
         auto n1 = graph->addNode(std::move(t1),{},juce::AudioProcessorGraph::UpdateKind::sync);
         auto n2 = graph->addNode(std::move(p1),{},juce::AudioProcessorGraph::UpdateKind::sync);
         {
@@ -113,6 +120,10 @@ int main() {
         }
     }
 
-    auto render = new MultiThreadGraphRender(graph);
+    auto render = new MultiThreadGraphRender(graph,rootNode->nodeID);
     render->debug();
+    juce::AudioBuffer<float> audioBuffer;
+    juce::MidiBuffer midiBuffer;
+    render->process(audioBuffer,midiBuffer);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 }

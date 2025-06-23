@@ -2,32 +2,94 @@
 #define MULTI_THREAD_GRAPH_RENDER_H
 #include <juce_audio_processors/juce_audio_processors.h>
 
-struct Node {
-    juce::AudioProcessor* current;
-    std::vector<Node*> children;
+
+struct RenderPath {
+    std::vector<juce::AudioProcessorGraph::NodeID> nodes;
 };
 
 
+class RenderJob : public juce::ThreadPoolJob {
+public:
+    RenderJob(juce::ThreadPool *pool,  juce::AudioProcessorGraph* graph,RenderPath path,juce::AudioProcessorGraph::NodeID nodeID,juce::AudioBuffer<float>* buffer,juce::MidiBuffer* midiMessages): ThreadPoolJob("RenderJob") {
+        this->pool = pool;
+        this->path = path;
+        this->graph = graph;
+        this->midiMessages = midiMessages;
+        this->buffer = buffer;
+        this->nodeID = nodeID;
+    }
+    JobStatus runJob() override {
+        auto node = this->graph->getNodeForId(nodeID);
+        node->getProcessor()->processBlock(*buffer,*midiMessages);
+        for (int i=0;i < path.nodes.size();i++) {
+            if (nodeID == path.nodes[i] && i != 0) {
+                auto job = new RenderJob(
+                    this->pool,
+                    this->graph,
+                    this->path,
+                    path.nodes[i-1],
+                    buffer,
+                    midiMessages
+                    );
+                this->pool->addJob(job,true);
+            }
+        }
+        return JobStatus::jobHasFinished;
+    }
+
+private:
+    juce::ThreadPool* pool;
+    juce::AudioBuffer<float>* buffer;
+    juce::MidiBuffer* midiMessages;
+    juce::AudioProcessorGraph* graph;
+    RenderPath path;
+    juce::AudioProcessorGraph::NodeID nodeID;
+
+};
+
 class MultiThreadGraphRender {
 public:
-    MultiThreadGraphRender(juce::AudioProcessorGraph* graph): graph(graph) {
-
+    MultiThreadGraphRender(juce::AudioProcessorGraph* graph,   juce::AudioProcessorGraph::NodeID rootNodeID): graph(graph),rootNodeID(rootNodeID) {
+        threadPool.reset(new juce::ThreadPool(4));
     }
     void debug() {
         this->rebuildGraph();
-        this->printNode(this->root,"");
-    }
-    void printNode(const Node* node, const std::string &prefix) {
-        std::cout << prefix << node->current->getName() << std::endl;
-        for (auto child : node->children) {
-            printNode(child,prefix + "  ");
+        for (auto p : this->paths) {
+            printNode(&p);
         }
+    }
+    void process(juce::AudioBuffer<float>& buffer,  juce::MidiBuffer& midiMessages) {
+        for (auto p : this->paths) {
+            auto start = p.nodes[p.nodes.size() -1];
+
+             auto j = new RenderJob(
+                this->threadPool.get(),
+                this->graph,
+                p,
+                start,
+                &buffer,
+                &midiMessages
+            );
+            this->threadPool->addJob(j,true);
+        }
+    }
+
+    void printNode(const RenderPath* path) {
+        for (auto child : path->nodes) {
+            auto node = this->graph->getNodeForId(child);
+            std::cout << " " << node->getProcessor()->getName() << " ->";
+        }
+        std::cout << "\n" << std::endl;
     }
 private:
     void rebuildGraph();
-    Node* buildNode(const juce::AudioProcessorGraph::NodeAndChannel& node,Node* container) ;
-juce::AudioProcessorGraph* graph = nullptr;
-    Node* root = nullptr;
+    void buildNode(const juce::AudioProcessorGraph::NodeAndChannel& node,std::vector<juce::AudioProcessorGraph::NodeID>* container) ;
+
+    std::unique_ptr<juce::ThreadPool> threadPool;
+    juce::AudioProcessorGraph* graph = nullptr;
+    juce::AudioProcessorGraph::NodeID rootNodeID;
+    std::vector<RenderPath> paths;
+
 };
 
 
