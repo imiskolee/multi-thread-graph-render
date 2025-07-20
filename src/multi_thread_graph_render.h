@@ -51,8 +51,8 @@ private:
 
 class MultiThreadGraphRender {
 public:
-    MultiThreadGraphRender(juce::AudioProcessorGraph* graph,   juce::AudioProcessorGraph::NodeID rootNodeID): graph(graph),rootNodeID(rootNodeID) {
-        threadPool.reset(new juce::ThreadPool(4));
+    MultiThreadGraphRender(juce::AudioProcessorGraph* graph, juce::AudioProcessorGraph::NodeID rootNodeID,int numOfThreads = 4): graph(graph),rootNodeID(rootNodeID) {
+        threadPool.reset(new juce::ThreadPool(numOfThreads));
         this->rebuildGraph();
     }
     void debug() {
