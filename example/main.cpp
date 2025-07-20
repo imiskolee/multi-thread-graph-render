@@ -21,9 +21,9 @@ private:
 
     void processBlock(juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages) override {
         std::cout << "Processing " << this->getName() << std::endl;
-        std::random_device rd;  // 用于获取种子
-        std::mt19937 gen(rd()); // 使用Mersenne Twister引擎
-        std::uniform_int_distribution<> dis(1, 10); // 均匀分布，范围[1, 5]
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> dis(1000, 5000);
         std::this_thread::sleep_for(std::chrono::milliseconds(dis(gen)));
         std::cout << "Processed " << this->getName() << std::endl;
     }
@@ -119,11 +119,9 @@ int main() {
             make_connection(graph,n2,rootNode);
         }
     }
-
     auto render = new MultiThreadGraphRender(graph,rootNode->nodeID);
     render->debug();
     juce::AudioBuffer<float> audioBuffer;
     juce::MidiBuffer midiBuffer;
     render->process(audioBuffer,midiBuffer);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 }

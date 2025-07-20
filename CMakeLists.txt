@@ -6,6 +6,7 @@ include(cmake/deps.cmake)
 include_directories(${JUCE_SOURCE_DIR}/modules ${json_SOURCE_DIR}/include src/deps/dart ${vst24_SOURCE_DIR})
 
 set(SOURCES
+        src/wait_group.h
         src/multi_thread_graph_render.h
         src/multi_thread_render_graph.cpp
 )
